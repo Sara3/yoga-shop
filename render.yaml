@@ -1,0 +1,32 @@
+# Render Blueprint: API + MCP HTTP services
+# Connect repo at https://github.com/Sara3/yoga-shop and deploy.
+
+services:
+  - type: web
+    name: yoga-api
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SELLER_WALLET
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: PORT
+        value: 3000
+
+  - type: web
+    name: yoga-mcp
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:mcp
+    envVars:
+      - key: MCP_PORT
+        value: 3001
+      - key: API_BASE_URL
+        fromService:
+          type: web
+          name: yoga-api
+          property: url
