@@ -1,22 +1,29 @@
 /**
- * Demo ACP (Agentic Commerce Protocol): real flow, simplified payment token.
- * CreateCheckout → UpdateCheckout → CompleteCheckout (with any token) → Stripe PaymentIntent.
+ * ACP (Agentic Commerce Protocol): create/update/complete/cancel checkout.
+ * Complete uses Stripe PaymentIntent; payment_token can be a Stripe payment_method id (pm_xxx)
+ * or in test mode only a demo token for flow testing.
  */
 
 import Stripe from 'stripe';
-import { getProduct } from '../lib/products';
+import { getProduct } from '../lib/products.js';
+import { isStripeLive } from '../lib/config.js';
 
 let stripeClient: Stripe | null = null;
 
 function getStripe(): Stripe {
   if (!stripeClient) {
     const key = process.env.STRIPE_SECRET_KEY;
-    if (!key?.startsWith('sk_')) {
-      throw new Error('Missing or invalid STRIPE_SECRET_KEY in .env');
+    if (!key?.startsWith('sk_test_') && !key?.startsWith('sk_live_')) {
+      throw new Error('Missing or invalid STRIPE_SECRET_KEY (use sk_test_... or sk_live_...)');
     }
     stripeClient = new Stripe(key);
   }
   return stripeClient;
+}
+
+/** True if payment_token looks like a Stripe payment_method id (pm_xxx). */
+function isStripePaymentMethodId(token: string): boolean {
+  return /^pm_[a-zA-Z0-9]+$/.test(token);
 }
 
 export interface CheckoutSession {
@@ -111,21 +118,36 @@ export interface CompleteCheckoutResult {
   total_display: string;
 }
 
-export async function completeCheckout(sessionId: string, _paymentToken: string): Promise<CompleteCheckoutResult> {
+export async function completeCheckout(sessionId: string, payment_token: string): Promise<CompleteCheckoutResult> {
   const session = checkoutSessions.get(sessionId);
   if (!session) throw new Error('Session not found');
   if (session.status !== 'open') throw new Error('Session not open');
 
   const orderId = `order_${Date.now()}`;
+  const live = isStripeLive();
 
-  // Demo: accept any payment token; charge via Stripe PaymentIntent (test mode)
+  // Live: require real Stripe payment_method id (pm_xxx). No demo fallback.
+  if (live && !isStripePaymentMethodId(payment_token)) {
+    throw new Error('Live mode requires a Stripe payment_method id (pm_xxx) as payment_token');
+  }
+
+  const paymentMethodId = isStripePaymentMethodId(payment_token)
+    ? payment_token
+    : live
+      ? undefined
+      : 'pm_card_visa'; // Test only: demo_token or unknown → use test card
+
+  if (live && !paymentMethodId) {
+    throw new Error('Live mode requires a valid Stripe payment_method id');
+  }
+
   try {
     const stripe = getStripe();
     const paymentIntent = await stripe.paymentIntents.create({
       amount: session.total_cents,
       currency: 'usd',
       confirm: true,
-      payment_method: 'pm_card_visa',
+      payment_method: paymentMethodId!,
       automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
     });
     session.stripe_payment_intent = paymentIntent.id;
@@ -140,8 +162,11 @@ export async function completeCheckout(sessionId: string, _paymentToken: string)
       total_charged_cents: session.total_cents,
       total_display: `$${(session.total_cents / 100).toFixed(2)}`,
     };
-  } catch {
-    // Fallback: if Stripe test PM fails, mark order complete for demo flow (no charge)
+  } catch (err) {
+    if (live) {
+      throw err;
+    }
+    // Test only: fallback for demo flow (e.g. Stripe test PM failed) — mark complete, no charge
     session.status = 'completed';
     session.order_id = orderId;
     ordersByOrderId.set(orderId, session);

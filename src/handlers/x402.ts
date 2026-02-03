@@ -13,8 +13,10 @@ import {
 import { useFacilitator } from 'x402/verify';
 import type { PaymentPayload, PaymentRequirements } from 'x402/types';
 
-const FACILITATOR_URL = process.env.FACILITATOR_URL || 'https://x402.org/facilitator';
+import { FACILITATOR_URL, X402_NETWORK, X402_DEMO_MODE } from '../lib/config.js';
+
 const X402_VERSION = 1;
+const DEMO_TOKEN = 'demo';
 
 export interface VerifyPaymentResult {
   valid: boolean;
@@ -35,7 +37,7 @@ export interface PaymentRequirementsInput {
  */
 export function buildPaymentRequirements(input: PaymentRequirementsInput): PaymentRequirements[] {
   const { price, network, payTo, resource, description = '', method = 'GET' } = input;
-  const result = processPriceToAtomicAmount(price, network as 'base-sepolia');
+  const result = processPriceToAtomicAmount(price, network as 'base-sepolia' | 'base');
   if ('error' in result) {
     throw new Error(result.error);
   }
@@ -46,7 +48,7 @@ export function buildPaymentRequirements(input: PaymentRequirementsInput): Payme
   return [
     {
       scheme: 'exact',
-      network: network as 'base-sepolia',
+      network: network as 'base-sepolia' | 'base',
       maxAmountRequired,
       resource,
       description,
@@ -69,6 +71,7 @@ export function buildPaymentRequirements(input: PaymentRequirementsInput): Payme
 
 /**
  * Verify and settle payment via facilitator. Returns valid + txHash on success.
+ * In demo mode (X402_DEMO_MODE=true), accepts "demo" token to bypass verification.
  */
 export async function verifyPayment(
   paymentProof: string,
@@ -76,6 +79,14 @@ export async function verifyPayment(
   expectedRecipient: string,
   options: { resource: string; price: string; network: string; description?: string }
 ): Promise<VerifyPaymentResult> {
+  // Demo mode: allow "demo" token to bypass verification (testing only)
+  if (X402_DEMO_MODE && paymentProof === DEMO_TOKEN) {
+    return {
+      valid: true,
+      txHash: `0x${'0'.repeat(64)}`, // Demo tx hash
+    };
+  }
+
   const { resource, price, network, description = '' } = options;
   const facilitator = { url: FACILITATOR_URL as `${string}://${string}` };
   const { verify, settle } = useFacilitator(facilitator);

@@ -5,6 +5,7 @@
  */
 
 import 'dotenv/config';
+import express from 'express';
 import { createYogaMcpServer } from './mcp-tools.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
@@ -14,7 +15,15 @@ const MCP_PORT = parseInt(process.env.PORT || process.env.MCP_PORT || '3001', 10
 
 const app = createMcpExpressApp({ host: '0.0.0.0' });
 
-app.all('/mcp', async (req, res) => {
+// Health/root so Render and connection checks get 200 (avoid 503 from failed health check)
+app.get('/', (_req, res) => {
+  res.json({ service: 'mcp', endpoint: '/mcp' });
+});
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
+const mcpHandler = async (req: express.Request, res: express.Response): Promise<void> => {
   try {
     const server = createYogaMcpServer(API_BASE);
     const transport = new StreamableHTTPServerTransport({
@@ -36,7 +45,10 @@ app.all('/mcp', async (req, res) => {
       });
     }
   }
-});
+};
+
+// Match /mcp, /mcp/, /mcp/sse, or any path under /mcp so connection checks never get 404
+app.all(/^\/mcp(\/.*)?$/, mcpHandler);
 
 app.listen(MCP_PORT, () => {
   console.log(`MCP Streamable HTTP server at http://0.0.0.0:${MCP_PORT}/mcp`);

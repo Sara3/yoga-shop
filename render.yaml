@@ -7,6 +7,7 @@ services:
     runtime: node
     buildCommand: npm install && npm run build
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
@@ -14,6 +15,13 @@ services:
         sync: false
       - key: STRIPE_SECRET_KEY
         sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: BASE_URL
+        fromService:
+          type: web
+          name: yoga-api
+          property: url
       - key: PORT
         value: 3000
 
@@ -22,6 +30,7 @@ services:
     runtime: node
     buildCommand: npm install && npm run build
     startCommand: npm run start:mcp
+    healthCheckPath: /health
     envVars:
       - key: MCP_PORT
         value: 3001
