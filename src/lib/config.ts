@@ -23,9 +23,6 @@ export const isX402Testnet = X402_NETWORK === 'base-sepolia';
 /** Facilitator URL. Default public facilitator; override for custom. */
 export const FACILITATOR_URL = raw.FACILITATOR_URL || 'https://x402.org/facilitator';
 
-/** x402 demo mode: if true, allows demo token "demo" to bypass payment verification (testing only). */
-export const X402_DEMO_MODE = raw.X402_DEMO_MODE === 'true' || raw.X402_DEMO_MODE === '1';
-
 /** CORS origin. Empty = same-origin only; * = allow all; or comma-separated list. */
 export const CORS_ORIGIN = raw.CORS_ORIGIN ?? '*';
 

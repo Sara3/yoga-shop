@@ -1,7 +1,7 @@
 /**
  * ACP (Agentic Commerce Protocol): create/update/complete/cancel checkout.
- * Complete uses Stripe PaymentIntent; payment_token can be a Stripe payment_method id (pm_xxx)
- * or in test mode only a demo token for flow testing.
+ * Complete uses Stripe PaymentIntent. In test mode (sk_test_...), accepts any payment_token and uses test card.
+ * In live mode (sk_live_...), requires real Stripe payment_method id (pm_xxx).
  */
 
 import Stripe from 'stripe';
@@ -126,7 +126,7 @@ export async function completeCheckout(sessionId: string, payment_token: string)
   const orderId = `order_${Date.now()}`;
   const live = isStripeLive();
 
-  // Live: require real Stripe payment_method id (pm_xxx). No demo fallback.
+  // Live: require real Stripe payment_method id (pm_xxx). Test mode accepts any token and uses test card.
   if (live && !isStripePaymentMethodId(payment_token)) {
     throw new Error('Live mode requires a Stripe payment_method id (pm_xxx) as payment_token');
   }
@@ -135,7 +135,7 @@ export async function completeCheckout(sessionId: string, payment_token: string)
     ? payment_token
     : live
       ? undefined
-      : 'pm_card_visa'; // Test only: demo_token or unknown → use test card
+      : 'pm_card_visa'; // Test mode: any non-pm_ token uses Stripe test card
 
   if (live && !paymentMethodId) {
     throw new Error('Live mode requires a valid Stripe payment_method id');

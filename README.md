@@ -42,9 +42,8 @@ Save and trigger **Manual Deploy**. (Or use **Blueprint** → **Sync** to apply 
      - **Key:** `SELLER_WALLET` → **Value:** Your Base Sepolia address (e.g. `0xc0f4fF27A67f2238eD0DbD3Fdcc6Ffc10F95698c`)
      - **Key:** `STRIPE_SECRET_KEY` → **Value:** Your Stripe test key (e.g. `sk_test_51...`)
    - Click **Save Changes** (Render will auto-redeploy)
-4. **(Optional)** For automated testing: add `X402_DEMO_MODE` → `true` to enable demo mode for x402 payments.
-5. Ensure **Build Command** is `npm install && npm run build` for both services (Blueprint sets this; if you created services manually, set it in Settings).
-6. Deploy. After deploy you get:
+4. Ensure **Build Command** is `npm install && npm run build` for both services (Blueprint sets this; if you created services manually, set it in Settings).
+5. Deploy. After deploy you get:
    - **API URL:** `https://yoga-api.onrender.com`
    - **MCP URL:** `https://yoga-mcp.onrender.com/mcp`
 
@@ -72,53 +71,28 @@ In Cursor: add an MCP server with **URL** = that `/mcp` URL (Streamable HTTP). N
 | `create_checkout` | Legacy Stripe redirect URL |
 | `health` | API health |
 
-## Automated testing / demo mode
+## Testing (testnet / test mode)
 
-Both payment flows support automated testing without real payments:
+**Default setup uses testnet/test mode:**
+- **x402:** Uses `base-sepolia` testnet (test USDC) — no real money
+- **Stripe:** Uses `sk_test_...` test keys — no real charges
 
-### Stripe (ACP) — already automated in test mode
-
-When using a **test key** (`sk_test_...`), Stripe payments are automatically handled:
-- Pass any non-`pm_xxx` token (e.g. `"demo"`, `"test"`, `"auto"`) to `acp_complete_checkout` → automatically uses Stripe test card `pm_card_visa`
-- No real charges; works for automated testing and demos
-
-**Example:**
-```bash
-# Create checkout
-curl -X POST https://your-api.com/acp/checkout -d '{"productId":"mat","quantity":1}'
-# → {"checkout_session_id":"acp_...", ...}
-
-# Complete with demo token (test mode only)
-curl -X POST https://your-api.com/acp/checkout/acp_.../complete \
-  -d '{"payment_token":"demo"}'
-# → Automatically uses test card, completes successfully
-```
-
-### x402 (crypto) — enable demo mode
-
-Set `X402_DEMO_MODE=true` in your `.env` or Render env vars. Then:
-- Pass `"demo"` as the `X-PAYMENT` header → bypasses blockchain verification
-- Returns success with a demo transaction hash
-- **Only works when `X402_DEMO_MODE=true`** (disabled by default for security)
-
-**Example:**
-```bash
-# Get class (requires payment)
-curl https://your-api.com/class/1/full
-# → 402 with payment requirements
-
-# Access with demo token (when X402_DEMO_MODE=true)
-curl https://your-api.com/class/1/full \
-  -H 'X-PAYMENT: demo'
-# → {"content_url":"...", "tx_hash":"0x0000..."}
-```
-
-**⚠️ Security:** Never enable `X402_DEMO_MODE` in production. It's for testing/demos only.
+Test both payment methods with testnet/test mode first. Once everything works, switch to live mode below.
 
 ## Going live (real money)
 
-1. **Stripe:** Use live key `sk_live_...` and set `STRIPE_WEBHOOK_SECRET` (whsec_...) from Dashboard → Webhooks. Add endpoint `https://your-api.com/webhook` (POST, raw body). ACP complete-checkout in live mode requires a real Stripe `payment_method` id (pm_xxx) as `payment_token` — no demo token.
-2. **x402:** Set `X402_NETWORK=base` for Base mainnet (real USDC). Use a mainnet facilitator if required; default is `https://x402.org/facilitator`. Set `SELLER_WALLET` to your mainnet payout address.
+After testing with testnet/test mode, switch to live:
+
+1. **Stripe:** 
+   - Replace `sk_test_...` with live key `sk_live_...` in Render env vars
+   - Set `STRIPE_WEBHOOK_SECRET` (whsec_...) from Dashboard → Webhooks
+   - Add webhook endpoint `https://your-api.com/webhook` (POST, raw body)
+   - In live mode, `acp_complete_checkout` requires a real Stripe `payment_method` id (pm_xxx) as `payment_token`
+
+2. **x402:** 
+   - Set `X402_NETWORK=base` for Base mainnet (real USDC) in Render env vars
+   - Use a mainnet facilitator if required; default is `https://x402.org/facilitator`
+   - Set `SELLER_WALLET` to your mainnet payout address (Base mainnet, not Sepolia)
 3. **BASE_URL:** Set to your API base (e.g. `https://yoga-api.onrender.com`) so success/cancel and paywall URLs are correct.
 4. **Content:** Set `CLASS_1_PREVIEW_URL`, `CLASS_1_FULL_URL`, etc. to real video URLs.
 5. **CORS / rate limit:** Tighten `CORS_ORIGIN` and `RATE_LIMIT_MAX` as needed.

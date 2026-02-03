@@ -138,10 +138,10 @@ export function createYogaMcpServer(apiBase: string = API_BASE_DEFAULT): McpServ
     'acp_complete_checkout',
     {
       description:
-        'Complete ACP checkout with payment token. Demo accepts any token (e.g. "demo_token"); charges via Stripe.',
+        'Complete ACP checkout with payment token. In test mode (sk_test_...), accepts Stripe test payment_method id (pm_xxx) or uses test card. In live mode (sk_live_...), requires real payment_method id.',
       inputSchema: z.object({
         checkout_session_id: z.string().describe('Session id from acp_create_checkout'),
-        payment_token: z.string().describe('Payment token (demo: use "demo_token")'),
+        payment_token: z.string().describe('Payment token: Stripe payment_method id (pm_xxx) for live mode, or any token for test mode (uses test card)'),
       }),
     },
     async ({
