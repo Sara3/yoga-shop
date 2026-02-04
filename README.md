@@ -6,7 +6,7 @@ x402 (on-chain payments) + Stripe + ACP (Agentic Commerce Protocol) demo for yog
 
 ```bash
 cp .env.example .env
-# Edit .env: SELLER_WALLET (Base Sepolia), STRIPE_SECRET_KEY (sk_test_...)
+# Edit .env: SELLER_WALLET (Base mainnet address), STRIPE_SECRET_KEY (sk_test_... or sk_live_...)
 npm install
 npm run build
 ```
@@ -27,7 +27,7 @@ npm install && npm run build
 
 Save and trigger **Manual Deploy**. (Or use **Blueprint** → **Sync** to apply `render.yaml` so both services get this build command.)
 
-**If deploy fails with "Missing SELLER_WALLET in .env"** — Set the env vars in Render. Open the **yoga-api** service → **Environment** → add `SELLER_WALLET` (your Base Sepolia payout address, e.g. `0x...`) and `STRIPE_SECRET_KEY` (e.g. `sk_test_...`). Save; Render will redeploy.
+**If deploy fails with "Missing SELLER_WALLET in .env"** — Set the env vars in Render. Open the **yoga-api** service → **Environment** → add `SELLER_WALLET` (your Base mainnet address that will receive USDC payments, e.g. `0x...`) and `STRIPE_SECRET_KEY` (e.g. `sk_test_...` or `sk_live_...`). Save; Render will redeploy.
 
 ---
 
@@ -39,8 +39,8 @@ Save and trigger **Manual Deploy**. (Or use **Blueprint** → **Sync** to apply 
    - Open the **yoga-api** service in Render dashboard
    - Go to **Environment** (left sidebar)
    - Click **Add Environment Variable** and add:
-     - **Key:** `SELLER_WALLET` → **Value:** Your Base Sepolia address (e.g. `0xc0f4fF27A67f2238eD0DbD3Fdcc6Ffc10F95698c`)
-     - **Key:** `STRIPE_SECRET_KEY` → **Value:** Your Stripe test key (e.g. `sk_test_51...`)
+     - **Key:** `SELLER_WALLET` → **Value:** Your Base mainnet address (your MetaMask address that will receive USDC payments, e.g. `0xc0f4fF27A67f2238eD0DbD3Fdcc6Ffc10F95698c`)
+     - **Key:** `STRIPE_SECRET_KEY` → **Value:** Your Stripe key (e.g. `sk_test_51...` for testing or `sk_live_...` for real money)
    - Click **Save Changes** (Render will auto-redeploy)
 4. Ensure **Build Command** is `npm install && npm run build` for both services (Blueprint sets this; if you created services manually, set it in Settings).
 5. Deploy. After deploy you get:
@@ -71,31 +71,38 @@ In Cursor: add an MCP server with **URL** = that `/mcp` URL (Streamable HTTP). N
 | `create_checkout` | Legacy Stripe redirect URL |
 | `health` | API health |
 
-## Testing (testnet / test mode)
+## Configuration (Real Money Setup)
 
-**Default setup uses testnet/test mode:**
-- **x402:** Uses `base-sepolia` testnet (test USDC) — no real money
-- **Stripe:** Uses `sk_test_...` test keys — no real charges
+**Default setup uses real money:**
+- **x402:** Uses `base` mainnet (real USDC) — real money payments
+- **Stripe:** Use `sk_live_...` for real charges, or `sk_test_...` for testing
 
-Test both payment methods with testnet/test mode first. Once everything works, switch to live mode below.
+**Important Configuration:**
 
-## Going live (real money)
+1. **SELLER_WALLET:** Set this to your MetaMask Base mainnet address (the address that will receive USDC payments). This is your "Buyer" account address from MetaMask when connected to Base network.
 
-After testing with testnet/test mode, switch to live:
+2. **x402 (Crypto payments for classes):**
+   - Default network is `base` (mainnet, real USDC)
+   - Default facilitator is `https://x402.org/facilitator` (works with Base mainnet)
+   - Payments will be sent to your `SELLER_WALLET` address on Base mainnet
+   - Make sure your wallet has some ETH for gas fees (even though payments are in USDC)
 
-1. **Stripe:** 
-   - Replace `sk_test_...` with live key `sk_live_...` in Render env vars
+3. **Stripe (for products and ACP):**
+   - Use `sk_live_...` for real money (production)
+   - Use `sk_test_...` for testing
    - Set `STRIPE_WEBHOOK_SECRET` (whsec_...) from Dashboard → Webhooks
    - Add webhook endpoint `https://your-api.com/webhook` (POST, raw body)
-   - In live mode, `acp_complete_checkout` requires a real Stripe `payment_method` id (pm_xxx) as `payment_token`
+   - ACP `complete_checkout` requires a real Stripe `payment_method` id (pm_xxx) as `payment_token`
 
-2. **x402:** 
-   - Set `X402_NETWORK=base` for Base mainnet (real USDC) in Render env vars
-   - Use a mainnet facilitator if required; default is `https://x402.org/facilitator`
-   - Set `SELLER_WALLET` to your mainnet payout address (Base mainnet, not Sepolia)
-3. **BASE_URL:** Set to your API base (e.g. `https://yoga-api.onrender.com`) so success/cancel and paywall URLs are correct.
-4. **Content:** Set `CLASS_1_PREVIEW_URL`, `CLASS_1_FULL_URL`, etc. to real video URLs.
-5. **CORS / rate limit:** Tighten `CORS_ORIGIN` and `RATE_LIMIT_MAX` as needed.
+4. **BASE_URL:** Set to your API base (e.g. `https://yoga-api.onrender.com`) so success/cancel and paywall URLs are correct.
+
+5. **Content:** Set `CLASS_1_PREVIEW_URL`, `CLASS_1_FULL_URL`, etc. to real video URLs.
+
+6. **CORS / rate limit:** Tighten `CORS_ORIGIN` and `RATE_LIMIT_MAX` as needed.
+
+**For testing with testnet:**
+- Set `X402_NETWORK=base-sepolia` to use Base Sepolia testnet (test USDC)
+- Use `sk_test_...` Stripe keys for test mode
 
 ## Scripts
 
