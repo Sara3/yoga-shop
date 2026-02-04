@@ -52,7 +52,7 @@ function toolResult(text: string, isError = false) {
 
 export function createYogaMcpServer(apiBase: string = API_BASE_DEFAULT): McpServer {
   const server = new McpServer(
-    { name: 'yoga-commerce', version: '1.0.0' },
+    { name: 'yoga-commerce', version: '1.1.0' },
     { capabilities: { tools: {} } }
   );
 
