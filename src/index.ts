@@ -273,6 +273,15 @@ app.get('/class/:id/full', async (req, res) => {
     });
   }
 
+  console.log('[API] /class/:id/full - Payment header received');
+  console.log('[API] Class ID:', req.params.id);
+  console.log('[API] Class price:', c.price, '(', c.price_usdc, 'USDC)');
+  console.log('[API] Expected amount (microUSDC):', c.price_usdc * 1_000_000);
+  console.log('[API] Seller wallet:', sellerWallet);
+  console.log('[API] Network:', X402_NETWORK);
+  console.log('[API] Payment header length:', paymentHeader.length);
+  console.log('[API] Payment header preview:', paymentHeader.substring(0, 100) + '...');
+
   const verification = await verifyPayment(
     paymentHeader,
     c.price_usdc * 1_000_000,
@@ -286,8 +295,12 @@ app.get('/class/:id/full', async (req, res) => {
   );
 
   if (!verification.valid) {
+    console.error('[API] ✗ Payment verification failed for class:', req.params.id);
     return res.status(402).json({ error: 'Invalid payment' });
   }
+
+  console.log('[API] ✓ Payment verified successfully for class:', req.params.id);
+  console.log('[API] Transaction hash:', verification.txHash);
 
   res.json({
     content_url: c.full_url,
