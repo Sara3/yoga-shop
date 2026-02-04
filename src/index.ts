@@ -197,12 +197,12 @@ app.patch('/acp/checkout/:sessionId', async (req, res) => {
 });
 
 app.post('/acp/checkout/:sessionId/complete', async (req, res) => {
-  const { payment_token } = req.body as { payment_token?: string };
+  const { payment_token, customer } = req.body as { payment_token?: string; customer?: string };
   if (!payment_token) {
     return res.status(400).json({ error: 'payment_token is required' });
   }
   try {
-    const result = await acpCompleteCheckout(req.params.sessionId, payment_token);
+    const result = await acpCompleteCheckout(req.params.sessionId, payment_token, customer);
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Complete checkout failed';

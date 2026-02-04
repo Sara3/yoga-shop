@@ -118,7 +118,7 @@ export interface CompleteCheckoutResult {
   total_display: string;
 }
 
-export async function completeCheckout(sessionId: string, payment_token: string): Promise<CompleteCheckoutResult> {
+export async function completeCheckout(sessionId: string, payment_token: string, customer?: string): Promise<CompleteCheckoutResult> {
   const session = checkoutSessions.get(sessionId);
   if (!session) throw new Error('Session not found');
   if (session.status !== 'open') throw new Error('Session not open');
@@ -133,13 +133,20 @@ export async function completeCheckout(sessionId: string, payment_token: string)
   const paymentMethodId = payment_token;
 
   const stripe = getStripe();
-  const paymentIntent = await stripe.paymentIntents.create({
+  const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
     amount: session.total_cents,
     currency: 'usd',
     confirm: true,
     payment_method: paymentMethodId!,
     automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-  });
+  };
+
+  // If customer is provided, include it (required when payment_method belongs to a customer)
+  if (customer) {
+    paymentIntentParams.customer = customer;
+  }
+
+  const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
   session.stripe_payment_intent = paymentIntent.id;
   session.status = 'completed';
   session.order_id = orderId;
