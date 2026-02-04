@@ -57,28 +57,28 @@ export function buildPaymentRequirements(input: PaymentRequirementsInput): Payme
     throw new Error('EVM asset with eip712 required');
   }
   
-  const requirements = [
-    {
-      scheme: 'exact',
-      network: network as 'base-sepolia' | 'base',
-      maxAmountRequired,
-      resource,
-      description,
-      mimeType: '',
-      payTo: getAddress(payTo as `0x${string}`),
-      maxTimeoutSeconds: 60,
-      asset: getAddress(asset.address as `0x${string}`),
-      outputSchema: {
-        input: {
-          type: 'http',
-          method,
-          discoverable: true,
-        },
-        output: undefined,
+  const requirement: PaymentRequirements = {
+    scheme: 'exact',
+    network: network as 'base-sepolia' | 'base',
+    maxAmountRequired,
+    resource,
+    description,
+    mimeType: '',
+    payTo: getAddress(payTo as `0x${string}`),
+    maxTimeoutSeconds: 60,
+    asset: getAddress(asset.address as `0x${string}`),
+    outputSchema: {
+      input: {
+        type: 'http',
+        method,
+        discoverable: true,
       },
-      extra: asset.eip712,
+      output: undefined,
     },
-  ];
+    extra: asset.eip712,
+  };
+  
+  const requirements: PaymentRequirements[] = [requirement];
   
   console.log('[x402] ✓ Payment requirements built successfully');
   console.log('[x402] Requirements:', JSON.stringify(requirements, null, 2));
@@ -115,18 +115,72 @@ export async function verifyPayment(
     (decodedPayment as PaymentPayload & { x402Version?: number }).x402Version = X402_VERSION;
     console.log('[x402] ✓ Payment decoded successfully');
     console.log('[x402] Decoded payment (full):', JSON.stringify(decodedPayment, null, 2));
-    // Try to access properties safely
+    
+    // Try to access properties safely and extract payer/signer information
     const decodedAny = decodedPayment as any;
+    
+    // Log basic payment fields
     if (decodedAny.network) console.log('[x402] Decoded payment network:', decodedAny.network);
     if (decodedAny.asset) console.log('[x402] Decoded payment asset:', decodedAny.asset);
     if (decodedAny.amount) console.log('[x402] Decoded payment amount:', decodedAny.amount);
     if (decodedAny.payTo) console.log('[x402] Decoded payment payTo:', decodedAny.payTo);
+    
+    // Extract payer/signer address from various possible locations
+    let payerAddress: string | undefined;
+    if (decodedAny.payer) {
+      payerAddress = decodedAny.payer;
+      console.log('[x402] Payer address (from payer field):', payerAddress);
+    }
+    if (decodedAny.signer) {
+      payerAddress = decodedAny.signer;
+      console.log('[x402] Signer address (from signer field):', payerAddress);
+    }
+    if (decodedAny.from) {
+      payerAddress = decodedAny.from;
+      console.log('[x402] From address (from from field):', payerAddress);
+    }
+    if (decodedAny.signature) {
+      console.log('[x402] Signature present:', typeof decodedAny.signature === 'string' ? decodedAny.signature.substring(0, 50) + '...' : JSON.stringify(decodedAny.signature));
+      if (decodedAny.signature.signer) {
+        payerAddress = decodedAny.signature.signer;
+        console.log('[x402] Signer address (from signature.signer):', payerAddress);
+      }
+      if (decodedAny.signature.address) {
+        payerAddress = decodedAny.signature.address;
+        console.log('[x402] Address (from signature.address):', payerAddress);
+      }
+    }
     if (decodedAny.payload) {
       console.log('[x402] Decoded payment payload:', JSON.stringify(decodedAny.payload, null, 2));
       if (decodedAny.payload.asset) console.log('[x402] Payload asset:', decodedAny.payload.asset);
       if (decodedAny.payload.amount) console.log('[x402] Payload amount:', decodedAny.payload.amount);
       if (decodedAny.payload.payTo) console.log('[x402] Payload payTo:', decodedAny.payload.payTo);
+      if (decodedAny.payload.payer) {
+        payerAddress = decodedAny.payload.payer;
+        console.log('[x402] Payer address (from payload.payer):', payerAddress);
+      }
+      if (decodedAny.payload.signer) {
+        payerAddress = decodedAny.payload.signer;
+        console.log('[x402] Signer address (from payload.signer):', payerAddress);
+      }
+      if (decodedAny.payload.from) {
+        payerAddress = decodedAny.payload.from;
+        console.log('[x402] From address (from payload.from):', payerAddress);
+      }
     }
+    
+    // Normalize payer address for comparison
+    if (payerAddress) {
+      try {
+        payerAddress = getAddress(payerAddress as `0x${string}`);
+        console.log('[x402] ✓ Extracted payer/signer address:', payerAddress);
+      } catch (e) {
+        console.warn('[x402] Could not normalize payer address:', payerAddress);
+      }
+    } else {
+      console.warn('[x402] ⚠ Could not extract payer/signer address from payment');
+    }
+    
   } catch (error) {
     console.error('[x402] ✗ Failed to decode payment proof:', error);
     if (error instanceof Error) {
@@ -191,21 +245,69 @@ export async function verifyPayment(
   // Step 4: Verify payment via facilitator
   try {
     console.log('[x402] Verifying payment with facilitator:', facilitator.url);
+    console.log('[x402] Sending to facilitator - decoded payment:', JSON.stringify(decodedPayment, null, 2));
+    console.log('[x402] Sending to facilitator - selected requirement:', JSON.stringify(selected, null, 2));
+    
     const verifyResponse = await verify(decodedPayment, selected);
-    console.log('[x402] Facilitator verify response:', JSON.stringify(verifyResponse, null, 2));
+    console.log('[x402] Facilitator verify response (full):', JSON.stringify(verifyResponse, null, 2));
+    
+    // Extract payer information from verify response if available
+    const verifyAny = verifyResponse as any;
+    if (verifyAny.payer) {
+      console.log('[x402] Payer address from verify response:', verifyAny.payer);
+    }
+    if (verifyAny.signer) {
+      console.log('[x402] Signer address from verify response:', verifyAny.signer);
+    }
+    if (verifyAny.from) {
+      console.log('[x402] From address from verify response:', verifyAny.from);
+    }
+    if (verifyAny.message) {
+      console.log('[x402] Verify response message:', verifyAny.message);
+    }
+    if (verifyAny.details) {
+      console.log('[x402] Verify response details:', JSON.stringify(verifyAny.details, null, 2));
+    }
+    
     if (!verifyResponse.isValid) {
       console.error('[x402] ✗ Payment verification failed - facilitator returned invalid');
+      console.error('[x402] Verify response isValid:', verifyResponse.isValid);
       if ('error' in verifyResponse) {
         console.error('[x402] Verification error:', verifyResponse.error);
+      }
+      if (verifyAny.reason) {
+        console.error('[x402] Verification reason:', verifyAny.reason);
+      }
+      if (verifyAny.failureReason) {
+        console.error('[x402] Verification failure reason:', verifyAny.failureReason);
       }
       return { valid: false };
     }
     console.log('[x402] ✓ Payment verified by facilitator');
+    
+    // Log additional verification details
+    if (verifyAny.transaction) {
+      console.log('[x402] Verification transaction:', verifyAny.transaction);
+    }
+    if (verifyAny.balance) {
+      console.log('[x402] Payer balance:', verifyAny.balance);
+    }
+    if (verifyAny.allowance) {
+      console.log('[x402] Payer allowance:', verifyAny.allowance);
+    }
   } catch (error) {
     console.error('[x402] ✗ Payment verification exception:', error);
     if (error instanceof Error) {
       console.error('[x402] Error message:', error.message);
       console.error('[x402] Error stack:', error.stack);
+      // Try to extract more details from error
+      if ('response' in error) {
+        const errResponse = (error as any).response;
+        console.error('[x402] Error response:', JSON.stringify(errResponse, null, 2));
+      }
+      if ('data' in error) {
+        console.error('[x402] Error data:', JSON.stringify((error as any).data, null, 2));
+      }
     }
     return { valid: false };
   }
@@ -213,17 +315,58 @@ export async function verifyPayment(
   // Step 5: Settle payment via facilitator
   try {
     console.log('[x402] Settling payment with facilitator:', facilitator.url);
+    console.log('[x402] Sending settle request - decoded payment:', JSON.stringify(decodedPayment, null, 2));
+    console.log('[x402] Sending settle request - selected requirement:', JSON.stringify(selected, null, 2));
+    
     const settleResponse = await settle(decodedPayment, selected);
-    console.log('[x402] Facilitator settle response:', JSON.stringify(settleResponse, null, 2));
+    console.log('[x402] Facilitator settle response (full):', JSON.stringify(settleResponse, null, 2));
+    
+    // Extract payer information from settle response if available
+    const settleAny = settleResponse as any;
+    if (settleAny.payer) {
+      console.log('[x402] Payer address from settle response:', settleAny.payer);
+    }
+    if (settleAny.signer) {
+      console.log('[x402] Signer address from settle response:', settleAny.signer);
+    }
+    if (settleAny.from) {
+      console.log('[x402] From address from settle response:', settleAny.from);
+    }
+    if (settleAny.message) {
+      console.log('[x402] Settle response message:', settleAny.message);
+    }
+    if (settleAny.details) {
+      console.log('[x402] Settle response details:', JSON.stringify(settleAny.details, null, 2));
+    }
+    
     if (!settleResponse.success) {
       console.error('[x402] ✗ Payment settlement failed');
+      console.error('[x402] Settle response success:', settleResponse.success);
       if ('error' in settleResponse) {
         console.error('[x402] Settlement error:', settleResponse.error);
+      }
+      if (settleAny.reason) {
+        console.error('[x402] Settlement reason:', settleAny.reason);
+      }
+      if (settleAny.failureReason) {
+        console.error('[x402] Settlement failure reason:', settleAny.failureReason);
+      }
+      if (settleAny.errorMessage) {
+        console.error('[x402] Settlement error message:', settleAny.errorMessage);
       }
       return { valid: false };
     }
     console.log('[x402] ✓ Payment settled successfully');
     console.log('[x402] Transaction hash:', settleResponse.transaction);
+    
+    // Log additional settlement details
+    if (settleAny.gasUsed) {
+      console.log('[x402] Gas used:', settleAny.gasUsed);
+    }
+    if (settleAny.blockNumber) {
+      console.log('[x402] Block number:', settleAny.blockNumber);
+    }
+    
     return {
       valid: true,
       txHash: settleResponse.transaction,
@@ -233,6 +376,14 @@ export async function verifyPayment(
     if (error instanceof Error) {
       console.error('[x402] Error message:', error.message);
       console.error('[x402] Error stack:', error.stack);
+      // Try to extract more details from error
+      if ('response' in error) {
+        const errResponse = (error as any).response;
+        console.error('[x402] Error response:', JSON.stringify(errResponse, null, 2));
+      }
+      if ('data' in error) {
+        console.error('[x402] Error data:', JSON.stringify((error as any).data, null, 2));
+      }
     }
     return { valid: false };
   }
