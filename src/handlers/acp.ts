@@ -1,7 +1,7 @@
 /**
  * ACP (Agentic Commerce Protocol): create/update/complete/cancel checkout.
- * Complete uses Stripe PaymentIntent. In test mode (sk_test_...), accepts any payment_token and uses test card.
- * In live mode (sk_live_...), requires real Stripe payment_method id (pm_xxx).
+ * Complete uses Stripe PaymentIntent. Requires real Stripe payment_method id (pm_xxx).
+ * Use sk_live_... key for production (real money).
  */
 
 import Stripe from 'stripe';
@@ -124,61 +124,34 @@ export async function completeCheckout(sessionId: string, payment_token: string)
   if (session.status !== 'open') throw new Error('Session not open');
 
   const orderId = `order_${Date.now()}`;
-  const live = isStripeLive();
 
-  // Live: require real Stripe payment_method id (pm_xxx). Test mode accepts any token and uses test card.
-  if (live && !isStripePaymentMethodId(payment_token)) {
-    throw new Error('Live mode requires a Stripe payment_method id (pm_xxx) as payment_token');
+  // Require real Stripe payment_method id (pm_xxx)
+  if (!isStripePaymentMethodId(payment_token)) {
+    throw new Error('payment_token must be a Stripe payment_method id (pm_xxx)');
   }
 
-  const paymentMethodId = isStripePaymentMethodId(payment_token)
-    ? payment_token
-    : live
-      ? undefined
-      : 'pm_card_visa'; // Test mode: any non-pm_ token uses Stripe test card
+  const paymentMethodId = payment_token;
 
-  if (live && !paymentMethodId) {
-    throw new Error('Live mode requires a valid Stripe payment_method id');
-  }
-
-  try {
-    const stripe = getStripe();
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: session.total_cents,
-      currency: 'usd',
-      confirm: true,
-      payment_method: paymentMethodId!,
-      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-    });
-    session.stripe_payment_intent = paymentIntent.id;
-    session.status = 'completed';
-    session.order_id = orderId;
-    ordersByOrderId.set(orderId, session);
-    return {
-      checkout_session_id: session.id,
-      status: 'completed',
-      order_id: orderId,
-      payment_status: paymentIntent.status ?? 'succeeded',
-      total_charged_cents: session.total_cents,
-      total_display: `$${(session.total_cents / 100).toFixed(2)}`,
-    };
-  } catch (err) {
-    if (live) {
-      throw err;
-    }
-    // Test only: fallback for demo flow (e.g. Stripe test PM failed) — mark complete, no charge
-    session.status = 'completed';
-    session.order_id = orderId;
-    ordersByOrderId.set(orderId, session);
-    return {
-      checkout_session_id: session.id,
-      status: 'completed',
-      order_id: orderId,
-      payment_status: 'succeeded',
-      total_charged_cents: session.total_cents,
-      total_display: `$${(session.total_cents / 100).toFixed(2)}`,
-    };
-  }
+  const stripe = getStripe();
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: session.total_cents,
+    currency: 'usd',
+    confirm: true,
+    payment_method: paymentMethodId!,
+    automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+  });
+  session.stripe_payment_intent = paymentIntent.id;
+  session.status = 'completed';
+  session.order_id = orderId;
+  ordersByOrderId.set(orderId, session);
+  return {
+    checkout_session_id: session.id,
+    status: 'completed',
+    order_id: orderId,
+    payment_status: paymentIntent.status ?? 'succeeded',
+    total_charged_cents: session.total_cents,
+    total_display: `$${(session.total_cents / 100).toFixed(2)}`,
+  };
 }
 
 export interface CancelCheckoutResult {

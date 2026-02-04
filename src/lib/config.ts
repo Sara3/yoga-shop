@@ -17,7 +17,7 @@ export function isStripeLive(): boolean {
 export const BASE_URL = raw.BASE_URL || '';
 
 /** x402 network: base-sepolia (testnet) or base (mainnet, real USDC). */
-export const X402_NETWORK = (raw.X402_NETWORK || 'base-sepolia') as 'base-sepolia' | 'base';
+export const X402_NETWORK = (raw.X402_NETWORK || 'base') as 'base-sepolia' | 'base';
 export const isX402Testnet = X402_NETWORK === 'base-sepolia';
 
 /** Facilitator URL. Default public facilitator; override for custom. */

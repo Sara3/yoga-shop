@@ -21,6 +21,7 @@ export const products: Product[] = [
     price_display: '$12.99',
     product_display_url: 'https://www.ob-fit.com/wp-content/uploads/2022/03/Yoga-Strap.jpg',
   },
+  
 ];
 
 export function getProduct(id: string): Product | undefined {

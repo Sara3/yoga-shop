@@ -9,7 +9,8 @@ export interface YogaClass {
   id: string;
   title: string;
   price: string;
-  price_usdc: number;
+  price_usdc: number; // Deprecated: kept for backward compatibility
+  price_cents: number; // Price in cents for Stripe
   preview_url: string;
   full_url: string;
 }
@@ -51,36 +52,43 @@ function url(id: string, kind: 'preview' | 'full'): string {
   return baseUrl;
 }
 
+// Helper function to randomly assign $1 or $2
+function randomPrice(): { price: string; price_usdc: number; price_cents: number } {
+  const price_usdc = Math.random() < 0.5 ? 1 : 2;
+  const price_cents = price_usdc * 100; // Convert to cents for Stripe
+  return {
+    price: `$${price_usdc}.00`,
+    price_usdc,
+    price_cents,
+  };
+}
+
 export const classes: YogaClass[] = [
   {
     id: '1',
     title: 'Morning Flow',
-    price: '$1.00',
-    price_usdc: 1,
+    ...randomPrice(),
     preview_url: url('1', 'preview'),
     full_url: url('1', 'full'), // Same video, stops at 20 seconds
   },
   {
     id: '2',
     title: 'Power Yoga',
-    price: '$2.00',
-    price_usdc: 2,
+    ...randomPrice(),
     preview_url: url('2', 'preview'),
     full_url: url('2', 'full'), // Same video, stops at 20 seconds
   },
   {
     id: '3',
     title: 'Flexibility',
-    price: '$3.00',
-    price_usdc: 3,
+    ...randomPrice(),
     preview_url: url('3', 'preview'),
     full_url: url('3', 'full'), // Same video, stops at 20 seconds
   },
   {
     id: '4',
     title: 'Flexibility',
-    price: '$3.00',
-    price_usdc: 3,
+    ...randomPrice(),
     preview_url: url('4', 'preview'),
     full_url: url('4', 'full'), // Same video, stops at 20 seconds
   }

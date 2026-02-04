@@ -101,7 +101,7 @@ app.get('/', (_req, res) => {
         `<li><a href="/class/${c.id}/full">${c.title}</a> — ${c.price} (full video)</li>`
     )
     .join('\n');
-  const networkLabel = isX402Testnet ? 'Base Sepolia, test USDC' : 'Base mainnet, USDC';
+  const networkLabel = isX402Testnet ? 'Base Sepolia, test USDC' : 'Base mainnet, real USDC';
   res.set('Content-Type', 'text/html').send(`
 <!DOCTYPE html>
 <html>
